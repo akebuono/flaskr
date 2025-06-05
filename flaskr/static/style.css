@@ -197,3 +197,18 @@ input[type="submit"]:hover {
     font-size: 1.8em;
   }
 }
+
+/* Styles for the remove entry button */
+.remove-entry {
+  margin-top: 0.5em;
+}
+
+.remove-entry input[type="submit"] {
+  background: var(--accent-color);
+  padding: 0.5em 1em;
+  font-size: 0.9em;
+}
+
+.remove-entry input[type="submit"]:hover {
+  background: #c0392b;
+}
