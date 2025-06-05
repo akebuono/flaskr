@@ -161,4 +161,91 @@ class AuthActions(object):
         return self._client.get('/logout', follow_redirects=True)
 
 
+class TestEntryManagement:
+    
+    def test_add_and_remove_entry(self):
+        """
+        Test adding and then removing an entry.
+        
+        This test verifies that:
+        1. A user can add an entry when logged in
+        2. The entry appears in the entries list
+        3. A user can remove the entry when logged in
+        4. The entry is no longer in the entries list after removal
+        """
+        with app.test_client() as client:
+            # Login
+            auth = AuthActions(client)
+            auth.login()
+            
+            # Add an entry
+            response = client.post('/add', data={
+                'title': 'Test Entry',
+                'text': 'This is a test entry that will be removed.'
+            }, follow_redirects=True)
+            
+            assert b'New entry was successfully posted' in response.data
+            assert b'Test Entry' in response.data
+            assert b'This is a test entry that will be removed.' in response.data
+            
+            # Get the entry ID
+            with app.app_context():
+                db = get_db()
+                entry = db.execute('SELECT id FROM entries WHERE title = ?', ['Test Entry']).fetchone()
+                assert entry is not None
+                entry_id = entry['id']
+            
+            # Remove the entry
+            response = client.post(f'/remove/{entry_id}', follow_redirects=True)
+            
+            assert b'Entry was successfully removed' in response.data
+            assert b'Test Entry' not in response.data
+            assert b'This is a test entry that will be removed.' not in response.data
+            
+            # Verify entry is removed from database
+            with app.app_context():
+                db = get_db()
+                entry = db.execute('SELECT id FROM entries WHERE title = ?', ['Test Entry']).fetchone()
+                assert entry is None
+    
+    def test_remove_entry_unauthorized(self):
+        """
+        Test that an unauthorized user cannot remove entries.
+        
+        This test verifies that:
+        1. A user who is not logged in cannot remove entries
+        2. The attempt results in a 401 Unauthorized response
+        """
+        with app.test_client() as client:
+            # First login to add an entry
+            auth = AuthActions(client)
+            auth.login()
+            
+            # Add an entry
+            client.post('/add', data={
+                'title': 'Protected Entry',
+                'text': 'This entry should not be removable by unauthorized users.'
+            }, follow_redirects=True)
+            
+            # Get the entry ID
+            with app.app_context():
+                db = get_db()
+                entry = db.execute('SELECT id FROM entries WHERE title = ?', ['Protected Entry']).fetchone()
+                assert entry is not None
+                entry_id = entry['id']
+            
+            # Logout
+            auth.logout()
+            
+            # Try to remove the entry without being logged in
+            response = client.post(f'/remove/{entry_id}')
+            
+            assert response.status_code == 401  # Unauthorized
+            
+            # Verify entry still exists in database
+            with app.app_context():
+                db = get_db()
+                entry = db.execute('SELECT id FROM entries WHERE title = ?', ['Protected Entry']).fetchone()
+                assert entry is not None
+
 
